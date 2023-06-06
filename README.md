@@ -1,7 +1,7 @@
 # K8s-deployment-using-Helm-Charts
 
 
-# First we need to switch to uat kubernetes context
+# First we need to switch to uat environment
 ```kubectl config use-context uat```
 
 # Run below command to check the namespaces in UAT.
