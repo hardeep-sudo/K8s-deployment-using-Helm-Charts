@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: beat
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: beat
+    role: backend
+    cluster: {{ .Values.cluster }}
+spec:
+  replicas: {{ .Values.beat.replicas }}
+  selector:
+    matchLabels:
+      app: beat
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 1
+  template:
+    metadata:
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/agent-inject-secret-beat-secrets.txt: internal/secrets/inetrnal
+        vault.hashicorp.com/agent-inject-template-beat-secrets.txt: |
+          {{`{{ with secret "internal/secrets/inetrnal" }}`}}
+            {{`{{ range $k,$v := .Data.data }}`}}
+              export {{`{{$k}}={{$v}}`}}
+            {{`{{ end }}`}}
+          {{`{{ end }}`}}
+        vault.hashicorp.com/log-level: debug
+        vault.hashicorp.com/role: {{ .Values.role }}
+      labels:
+        app: beat
+    spec:
+      containers:
+      - name: beat
+        image: "{{ .Values.images.repository }}/beat:{{ .Values.images.tag }}"
+        args: ["false"]
+        imagePullPolicy: {{ .Values.images.pullPolicy }}
+        command:
+        - /bin/bash
+        - -c
+        args:
+        - source /vault/secrets/beat-secrets.txt ; source /start.sh
+        envFrom:
+        - configMapRef:
+            name: beat-static-configmap
+        livenessProbe:
+          exec:
+            command:
+              - /opt/app/bin/beat
+              - rpc
+              - "true"
+          initialDelaySeconds: 20
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+              - /opt/app/bin/beat
+              - rpc
+              - "true"
+          initialDelaySeconds: 15
+          periodSeconds: 15
+          timeoutSeconds: 5
+        resources:
+          {{- toYaml .Values.beat.resources | nindent 10 }}
+      {{- with .Values.beat.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.beat.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.beat.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}

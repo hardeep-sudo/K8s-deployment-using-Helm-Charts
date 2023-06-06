@@ -1,0 +1,47 @@
+domain: uat.hardeep.com
+namespace: uat
+cluster: uat
+memoryStore:
+  enabled: false
+postgres:
+  enabled: true
+  nodeSelector:
+    kubernetes.io/hostname: kubernetes.local
+
+images:
+  pullPolicy: Always
+
+redis:
+  imageTag: "redis:6"
+
+datadog:
+  enabled: false
+
+certificateName: "ingress-ssl-cert"
+
+securityPolicy:
+  enabled: false
+  name: "uat-cf-lb-policy"
+
+logLevel: debug
+
+gcsArchiver:
+  bucket: "uat-archiver"
+  bucketDir: "uat"
+
+test1Pod:
+  archiver:
+    delete: true
+    archive: true
+    numToLeave: 10
+
+scheduleOnSpecificHost: &scheduleOnSpecificHost
+  nodeSelector:
+    kubernetes.io/hostname: kubernetes.local
+
+Pod2:
+  <<: *scheduleOnSpecificHost
+
+Pod3:
+  <<: *scheduleOnSpecificHost
+  startApplication: true

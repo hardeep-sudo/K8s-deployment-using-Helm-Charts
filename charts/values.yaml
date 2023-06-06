@@ -1,0 +1,77 @@
+namespace: default
+cluster: default
+logLevel: warn
+enablePreview: false
+storageClassName: "ssd"
+role: internal-role
+
+sonarqube:
+  enabled: false
+
+postgres:
+  tags:
+    app: postgres
+  enabled: true
+  port: 5432
+  iapProxy:
+    skipVerifyAud: true
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "2Gi"
+    limits:
+      cpu: "200m"
+      memory: "4Gi"
+
+ingress:
+  enabled: true
+  enableHTTP: false
+
+images:
+  repository: postgres
+  tag: latest
+  pullPolicy: IfNotPresent
+
+test-deployment:
+  tags:
+    app: test-deployment
+  port: 4000
+  replicas: 1
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "2Gi"
+    limits:
+      memory: "1Gi"
+  prometheus:
+    enabled: false
+    port: 1000
+    path: /internal/metrics
+  ibanValidator:
+    useMock: true
+    userLookupsPerDay: 10
+  replicationService:
+    useMock: true
+  coinfirm:
+    useMock: true
+    userLookupsPerDay: 5
+  compete:
+    rulesetEnv: "uat"
+
+beat:
+  tags:
+    app: beat
+  replicas: 1
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "400Mi"
+    limits:
+      cpu: "800m"
+      memory: "800Mi"

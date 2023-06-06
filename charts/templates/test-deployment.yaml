@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-deployment
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: test-deployment
+    role: test-deployment
+    cluster: {{ .Values.cluster }}
+spec:
+  replicas: {{ .Values.test-deployment.replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: test-deployment
+  template:
+    metadata:
+      labels:
+        app: test-deployment
+      annotations:
+        prometheus.io/path: /internal/healthz
+        prometheus.io/port: "4000"
+        prometheus.io/scrape: "false"
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/agent-inject-secret-test-deployment-secrets.txt: internal/secrets/test-deployment
+        vault.hashicorp.com/agent-inject-template-test-deployment-secrets.txt: |
+          {{`{{ with secret "internal/secrets/test-deployment" }}`}}
+            {{`{{ range $k,$v := .Data.data }}`}}
+              export {{`{{$k}}={{$v}}`}}
+            {{`{{ end }}`}}
+          {{`{{ end }}`}}
+        vault.hashicorp.com/log-level: debug
+        vault.hashicorp.com/role: {{ .Values.role }}
+    spec:
+      containers:
+      - name: test-deployment
+        image: "{{ .Values.images.repository }}/test-deployment:{{ .Values.images.tag }}"
+        imagePullPolicy: {{ .Values.images.pullPolicy }}
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        args:
+        -  source /vault/secrets/test-deployment-secrets.txt; source /start.sh
+        command:
+        - /bin/bash
+        - -c
+        envFrom:
+        - configMapRef:
+              name: test-deployment-static-configmap
+        ports:
+          - protocol: TCP
+            containerPort: {{ .Values.test-deployment.port }}
+            name: web
+        livenessProbe:
+          exec:
+            command:
+              - /opt/app/bin/test-deployment
+              - rpc
+              - "true"
+          initialDelaySeconds: 20
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 6
+        readinessProbe:
+          httpGet:
+            path: /internal/healthz
+            port: web
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 10
+          failureThreshold: 4
+        resources:
+          {{- toYaml .Values.test-deployment.resources | nindent 10 }}
+        volumeMounts:
+        - name: gcp-user-contacts-creds
+          mountPath: /secrets/user-contacts
+          readOnly: true
+      volumes:
+      - name: gcp-user-contacts-creds
+        secret:
+          secretName: gcp-contacts-credentials
+      {{ if .Values.promToSd.enabled }}
+      - name: stackdriver-credentials
+        secret:
+          secretName: stackdriver-credentials
+      {{ end }}
+      {{- with .Values.test-deployment.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.test-deployment.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.test-deployment.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
